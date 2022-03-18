@@ -1,0 +1,6 @@
+C:\Users\EmptyChapter\Desktop\Libraries\wmgr\wmgr\obj\Debug\wmgr.csproj.AssemblyReference.cache
+C:\Users\EmptyChapter\Desktop\Libraries\wmgr\wmgr\obj\Debug\wmgr.csproj.CoreCompileInputs.cache
+C:\Users\EmptyChapter\Desktop\Libraries\wmgr\wmgr\bin\Debug\wmgr.dll
+C:\Users\EmptyChapter\Desktop\Libraries\wmgr\wmgr\bin\Debug\wmgr.pdb
+C:\Users\EmptyChapter\Desktop\Libraries\wmgr\wmgr\obj\Debug\wmgr.dll
+C:\Users\EmptyChapter\Desktop\Libraries\wmgr\wmgr\obj\Debug\wmgr.pdb
