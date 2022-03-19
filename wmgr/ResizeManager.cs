@@ -24,6 +24,19 @@ namespace WindowManager
 
                 HwndSource.FromHwnd(mWindowHandle).AddHook(
                     new HwndSourceHook(WindowProc));
+
+                IntPtr myStyle = new(
+                    (int)User32.WindowStyle.WS_CAPTION |
+                    (int)User32.WindowStyle.WS_CLIPCHILDREN |
+                    (int)User32.WindowStyle.WS_MINIMIZEBOX |
+                    (int)User32.WindowStyle.WS_MAXIMIZEBOX |
+                    (int)User32.WindowStyle.WS_SYSMENU |
+                    (int)User32.WindowStyle.WS_SIZEBOX);
+
+                SetWindowLongPtr(
+                    new HandleRef(null, mWindowHandle), -16, myStyle);
+
+                WindowCommandsManager.AddWindowCommands(window);
             }
             else throw new ArgumentNullException();
         }
@@ -54,15 +67,15 @@ namespace WindowManager
             MONITORINFO lPrimaryScreenInfo = new();
             MONITORINFO lCurrentScreenInfo = new();
 
-            var lPrimaryScreen = MonitorFromPoint(new POINT(0, 0),
-                MonitorOptions.MONITOR_DEFAULTTOPRIMARY);
-            var lCurrentScreen = MonitorFromWindow(hwnd,
-                MonitorOptions.MONITOR_DEFAULTTONEAREST);
+            var lPrimaryScreen = User32.MonitorFromPoint(new POINT(0, 0),
+                User32.MonitorOptions.MONITOR_DEFAULTTOPRIMARY);
+            var lCurrentScreen = User32.MonitorFromWindow(hwnd,
+                User32.MonitorOptions.MONITOR_DEFAULTTONEAREST);
 
             var lPrimaryScreenGetInfoResult =
-                GetMonitorInfo(lPrimaryScreen, lPrimaryScreenInfo);
+                User32.GetMonitorInfo(lPrimaryScreen, lPrimaryScreenInfo);
             var lCurrentScreenGetInfoResult =
-                GetMonitorInfo(lCurrentScreen, lCurrentScreenInfo);
+                User32.GetMonitorInfo(lCurrentScreen, lCurrentScreenInfo);
 
             if (lPrimaryScreenGetInfoResult &&
                 lCurrentScreenGetInfoResult)
@@ -102,12 +115,12 @@ namespace WindowManager
 
         private static MINMAXINFO AdjustForTaskBar(IntPtr appMonitor, MINMAXINFO lMmi)
         {
-            var hwnd = FindWindow("Shell_TrayWnd", null);
+            var hwnd = User32.FindWindow("Shell_TrayWnd", null);
 
             if (hwnd != null)
             {
-                var taskBarMonitor = MonitorFromWindow(hwnd,
-                    MonitorOptions.MONITOR_DEFAULTTONEAREST);
+                var taskBarMonitor = User32.MonitorFromWindow(hwnd,
+                    User32.MonitorOptions.MONITOR_DEFAULTTONEAREST);
 
                 if (appMonitor.Equals(taskBarMonitor))
                 {
@@ -116,32 +129,34 @@ namespace WindowManager
                     abd.hWnd =          hwnd;
 
                     bool autoHide = Convert.ToBoolean(
-                        SHAppBarMessage(ABMsg.ABM_GETSTATE, ref abd));
+                        Shell32.SHAppBarMessage(
+                            Shell32.ABMsg.ABM_GETSTATE, ref abd));
 
                     if (autoHide)
                     {
                         abd.cbSize =    Marshal.SizeOf(abd);
                         abd.hWnd =      hwnd;
 
-                        SHAppBarMessage(ABMsg.ABM_GETTASKBARPOS, ref abd);
+                        Shell32.SHAppBarMessage(
+                            Shell32.ABMsg.ABM_GETTASKBARPOS, ref abd);
 
                         switch (GetEdge(abd.rc))
                         {
-                            case ABEdge.ABE_LEFT:
+                            case Shell32.ABEdge.ABE_LEFT:
                                 lMmi.ptMaxPosition.X +=     2;
                                 lMmi.ptMaxTrackSize.X -=    2;
                                 lMmi.ptMaxSize.X -=         2;
                                 break;
-                            case ABEdge.ABE_RIGHT:
+                            case Shell32.ABEdge.ABE_RIGHT:
                                 lMmi.ptMaxSize.X -=         2;
                                 lMmi.ptMaxTrackSize.X -=    2;
                                 break;
-                            case ABEdge.ABE_TOP:
+                            case Shell32.ABEdge.ABE_TOP:
                                 lMmi.ptMaxPosition.Y +=     2;
                                 lMmi.ptMaxTrackSize.Y -=    2;
                                 lMmi.ptMaxSize.Y -=         2;
                                 break;
-                            case ABEdge.ABE_BOTTOM:
+                            case Shell32.ABEdge.ABE_BOTTOM:
                                 lMmi.ptMaxSize.Y -=         2;
                                 lMmi.ptMaxTrackSize.Y -=    2;
                                 break;
@@ -155,75 +170,29 @@ namespace WindowManager
             return lMmi;
         }
 
-        private static ABEdge GetEdge(RECT rc)
+        private static Shell32.ABEdge GetEdge(RECT rc)
         {
             if (rc.Top == rc.Left &&
-                rc.Bottom > rc.Right)       return ABEdge.ABE_LEFT;
+                rc.Bottom > rc.Right)       return Shell32.ABEdge.ABE_LEFT;
 
             else if (rc.Top == rc.Left &&
-                     rc.Bottom < rc.Right)  return ABEdge.ABE_TOP;
+                     rc.Bottom < rc.Right)  return Shell32.ABEdge.ABE_TOP;
 
-            else if (rc.Top > rc.Left)      return ABEdge.ABE_BOTTOM;
+            else if (rc.Top > rc.Left)      return Shell32.ABEdge.ABE_BOTTOM;
 
-            else                            return ABEdge.ABE_RIGHT;
+            else                            return Shell32.ABEdge.ABE_RIGHT;
         }
 
-        #endregion
-
-        #region Externals
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetCursorPos(out POINT lpPoint);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr MonitorFromPoint(POINT pt, MonitorOptions dwFlags);
-
-        [DllImport("user32.dll")]
-        private static extern bool GetMonitorInfo(IntPtr hMonitor, MONITORINFO lpmi);
-
-        [DllImport("user32")]
-        private static extern IntPtr MonitorFromWindow(IntPtr handle, MonitorOptions flags);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-        [DllImport("shell32.dll", CallingConvention = CallingConvention.StdCall)]
-        private static extern int SHAppBarMessage(ABMsg dwMessage, ref APPBARDATA pData);
-
-        #endregion
-
-        #region Enumerators
-
-        private enum ABEdge
+        private static IntPtr SetWindowLongPtr(
+            HandleRef hWnd, int nIndex, IntPtr dwNewLong)
         {
-            ABE_UNKNOWN =       -1,
-            ABE_LEFT =           0,
-            ABE_TOP =            1,
-            ABE_RIGHT =          2,
-            ABE_BOTTOM =         3,
-        }
+            if (IntPtr.Size == 8)
+                return User32.SetWindowLongPtr64(
+                    hWnd, nIndex, dwNewLong);
 
-        private enum ABMsg : uint
-        {
-            ABM_NEW =                       0x00000000,
-            ABM_REMOVE =                    0x00000001,
-            ABM_QUERYPOS =                  0x00000002,
-            ABM_SETPOS =                    0x00000003,
-            ABM_GETSTATE =                  0x00000004,
-            ABM_GETTASKBARPOS =             0x00000005,
-            ABM_ACTIVATE =                  0x00000006,
-            ABM_GETAUTOHIDEBAR =            0x00000007,
-            ABM_SETAUTOHIDEBAR =            0x00000008,
-            ABM_WINDOWPOSCHANGED =          0x00000009,
-            ABM_SETSTATE =                  0x00000010,
-        }
-
-        private enum MonitorOptions : uint
-        {
-            MONITOR_DEFAULTTONULL =         0x00000000,
-            MONITOR_DEFAULTTOPRIMARY =      0x00000001,
-            MONITOR_DEFAULTTONEAREST =      0x00000002,
+            else return new IntPtr(
+                User32.SetWindowLong32(
+                    hWnd, nIndex, dwNewLong.ToInt32()));
         }
 
         #endregion
